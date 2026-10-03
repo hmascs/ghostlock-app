@@ -159,6 +159,15 @@ NATIVE_HOST_TESTS := \
   run_state_test address_space_test cpp_link_probe_test bootimg_uefi_test \
   bootimg_vendor_boot_test
 
+# Shared link deps for the two route tests. They reference the session
+# singleton, the support put32/put64 + rseq helpers and the image->direct-map
+# translation, so those objects must be on their link lines or ld fails with
+# undefined symbols.
+ROUTE_TEST_DEPS := core/session/exploit_session.cpp core/support/util.cpp \
+  core/memory/address_space.cpp core/session/runtime_config.cpp \
+  core/profile/binary.cpp core/memory/payload_builder.cpp \
+  core/support/run_state.cpp core/memory/heap_context.cpp
+
 native-host-tests: $(addprefix $(HOST_BUILD_DIR)/,$(NATIVE_HOST_TESTS))
 	@status=0; for test in $^; do $$test || status=1; done; exit $$status
 
@@ -304,13 +313,13 @@ $(HOST_BUILD_DIR)/pi_race_test: core/tests/pi_race_test.cpp core/race/pi_race.cp
 	@mkdir -p $(HOST_BUILD_DIR)
 	$(HOST_CXX) $(HOST_CXXFLAGS) -pthread -Icore core/tests/pi_race_test.cpp core/race/pi_race.cpp core/support/native_resource.cpp -o $@
 
-$(HOST_BUILD_DIR)/tcp_zerocopy_route_test: core/tests/tcp_zerocopy_route_test.cpp core/route/tcp_zerocopy_route.cpp core/route/tcp_zerocopy_route.h core/race/pi_race.cpp core/support/native_resource.cpp core/support/native_resource.hpp
+$(HOST_BUILD_DIR)/tcp_zerocopy_route_test: core/tests/tcp_zerocopy_route_test.cpp core/route/tcp_zerocopy_route.cpp core/route/tcp_zerocopy_route.h core/race/pi_race.cpp core/support/native_resource.cpp core/support/native_resource.hpp $(ROUTE_TEST_DEPS)
 	@mkdir -p $(HOST_BUILD_DIR)
-	$(HOST_CXX) $(HOST_CXXFLAGS) -pthread -Icore core/tests/tcp_zerocopy_route_test.cpp core/route/tcp_zerocopy_route.cpp core/race/pi_race.cpp core/support/native_resource.cpp -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) -pthread -Icore core/tests/tcp_zerocopy_route_test.cpp core/route/tcp_zerocopy_route.cpp core/race/pi_race.cpp core/support/native_resource.cpp $(ROUTE_TEST_DEPS) -o $@
 
-$(HOST_BUILD_DIR)/select_stack_route_test: core/tests/select_stack_route_test.cpp core/route/select_stack_route.cpp core/route/select_stack_route.h core/race/pi_race.cpp core/support/native_resource.cpp core/support/native_resource.hpp
+$(HOST_BUILD_DIR)/select_stack_route_test: core/tests/select_stack_route_test.cpp core/route/select_stack_route.cpp core/route/select_stack_route.h core/race/pi_race.cpp core/support/native_resource.cpp core/support/native_resource.hpp $(ROUTE_TEST_DEPS)
 	@mkdir -p $(HOST_BUILD_DIR)
-	$(HOST_CXX) $(HOST_CXXFLAGS) -pthread -Icore core/tests/select_stack_route_test.cpp core/route/select_stack_route.cpp core/race/pi_race.cpp core/support/native_resource.cpp -o $@
+	$(HOST_CXX) $(HOST_CXXFLAGS) -pthread -Icore core/tests/select_stack_route_test.cpp core/route/select_stack_route.cpp core/race/pi_race.cpp core/support/native_resource.cpp $(ROUTE_TEST_DEPS) -o $@
 
 $(HOST_BUILD_DIR)/futex_hash_test: core/tests/futex_hash_test.cpp core/kernelsnitch/futex_hash.h
 	@mkdir -p $(HOST_BUILD_DIR)
