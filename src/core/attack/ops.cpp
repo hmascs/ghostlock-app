@@ -7,6 +7,8 @@
  */
 
 #include "attack/ops.hpp"
+
+#include "bootimg/physmap.h"
 #include "support/fatal_error.hpp"
 
 #include "session/exploit_session.hpp"
@@ -239,6 +241,13 @@ namespace ghostlock::attack {
             "HOME_DIR='%s'\n"
             "LOG='%s'\n"
             "SAFE_MODE=%d\n"
+            /* vivo/iQOO: the framework keeps running while the kernel
+             * state changed underneath it (SELinux re-enforced by KSU,
+             * sys_exit probes disabled, vr.ko verdicts obsolete), and
+             * SystemUI crashes unless it resyncs soon after the handoff.
+             * The app sets this from the device brand; the shell block
+             * below is a no-op on other vendors. */
+            "REBOOT_AFTER_KSU=%d\n"
             "KSUD=\"$HOME_DIR/ksud\"\n"
             "echo \"[*] root script start uid=$(id -u) euid=$(id -u)\" >\"$LOG\"\n"
             "chmod 644 \"$LOG\" 2>/dev/null\n"
@@ -406,12 +415,28 @@ namespace ghostlock::attack {
             "  echo \"[*] kernelsu already loaded; restoring enforcing\" >>\"$LOG\"\n"
             "  echo 1 > /sys/fs/selinux/enforce 2>/dev/null\n"
             "fi\n"
+            "if [ \"$REBOOT_AFTER_KSU\" = 1 ] && [ \"${GHOSTLOCK_NO_SOFT_REBOOT:-0}\" != 1 ]; then\n"
+            "  echo '[*] vivo/iQOO: soft reboot in 4s so the framework resyncs' >>\"$LOG\"\n"
+            "  sync\n"
+            "  sleep 4\n"
+            "  if ! setprop ctl.restart zygote >>\"$LOG\" 2>&1; then\n"
+            "    echo '[!] ctl.restart zygote failed; falling back to stop/start' >>\"$LOG\"\n"
+            "    stop >>\"$LOG\" 2>&1\n"
+            "    start >>\"$LOG\" 2>&1\n"
+            "  fi\n"
+            "  echo '[*] soft reboot requested' >>\"$LOG\"\n"
+            "fi\n"
             "else\n"
             "  echo '[!] fixup failed; SELinux left permissive' >>\"$LOG\"\n"
             "fi\n",
             (config::runtime_config_snapshot().home_dir.c_str()),
             (config::runtime_config_snapshot().ksu_log_path.c_str()),
             session::g_exploit_session.profile.safe_mode() ? 1 : 0,
+            /* Empty span: the brand comes from the system properties. */
+            ghostlock::bootimg::detect_device_brand_runtime({}) == "vivo" ||
+                    ghostlock::bootimg::detect_device_brand_runtime({}) == "iqoo"
+                ? 1
+                : 0,
             (config::runtime_config_snapshot().debug_dir.c_str()));
         if (n < 0 || n >= static_cast<int32_t>(script.size())) {
             pr_warning("root script too long\n");
