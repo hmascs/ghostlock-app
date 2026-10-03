@@ -449,7 +449,7 @@ namespace ghostlock::attack {
             "  vr=0; grep -qiE '^vr' /proc/modules 2>/dev/null && vr=1\n"
             "  enf=$(cat /sys/fs/selinux/enforce 2>/dev/null)\n"
             "  su_ok=-\n"
-            "  if [ \"$((i %%%% 4))\" = 1 ]; then\n"
+            "  if [ \"$((i %% 4))\" = 1 ]; then\n"
             "    if [ -x /system/bin/su ] && /system/bin/su -c true 2>/dev/null; then su_ok=1; else su_ok=0; fi\n"
             "  fi\n"
             "  log \"ksu=$ksu su=$su_ok vr=$vr enforce=$enf\"\n"
