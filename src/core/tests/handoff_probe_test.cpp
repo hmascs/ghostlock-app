@@ -17,13 +17,22 @@ using namespace ghostlock;
 
 namespace {
     struct TempLogDir {
-        char path[64];
+        /* TMPDIR on a device is long (e.g. /data/user/0/<pkg>/files/home/tmp),
+         * so the buffer must hold the whole path plus the template suffix. */
+        char path[512];
         std::string log_path;
     };
 
+    /* /tmp does not exist on Android; honour TMPDIR first so the same test runs
+     * on a device and on a desktop host, and only fall back to /tmp. */
+    const char *temp_root() {
+        const char *tmp = std::getenv("TMPDIR");
+        return (tmp != nullptr && *tmp != '\0') ? tmp : "/tmp";
+    }
+
     TempLogDir make_temp_log_dir(const char *contents) {
         TempLogDir dir{};
-        snprintf(dir.path, sizeof(dir.path), "/tmp/ghostlock_handoff_XXXXXX");
+        snprintf(dir.path, sizeof(dir.path), "%s/ghostlock_handoff_XXXXXX", temp_root());
         assert(mkdtemp(dir.path) != nullptr);
         dir.log_path = std::string(dir.path) + "/.ghostlock_ksu.log";
         if (contents) {
